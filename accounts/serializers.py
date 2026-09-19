@@ -42,3 +42,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   'phone', 'date_of_birth', 'bio', 'profile_picture',
                   'travel_preferences', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name',
+                  'phone', 'date_of_birth', 'bio', 'profile_picture',
+                  'travel_preferences', 'is_active', 'is_staff',
+                  'is_superuser', 'created_at']
+        read_only_fields = ['id', 'created_at']
