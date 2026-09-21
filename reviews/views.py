@@ -1,14 +1,16 @@
-from rest_framework import generics, permissions, filters
+from rest_framework import viewsets, permissions, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Review
 from .serializers import ReviewSerializer
 from .permissions import IsReviewOwnerOrAdminOrReadOnly
 
 
-class ReviewListCreateView(generics.ListCreateAPIView):
+class ReviewViewSet(viewsets.ModelViewSet):
     """
-    GET /api/reviews/ - list all reviews, filterable by destination or rating
-    POST /api/reviews/ - create a new review (must be logged in)
+    Full CRUD for reviews. Anyone can read; only the author or an
+    admin can update/delete a given review.
     """
     queryset = Review.objects.select_related('reviewer', 'destination').all()
     serializer_class = ReviewSerializer
@@ -17,19 +19,24 @@ class ReviewListCreateView(generics.ListCreateAPIView):
     ordering_fields = ['created_at', 'rating']
 
     def get_permissions(self):
-        if self.request.method == 'POST':
+        if self.action == 'create':
             return [permissions.IsAuthenticated()]
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsReviewOwnerOrAdminOrReadOnly()]
         return [permissions.AllowAny()]
 
     def perform_create(self, serializer):
         serializer.save(reviewer=self.request.user)
 
-
-class ReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET /api/reviews/<id>/ - view a specific review (anyone)
-    PUT/PATCH/DELETE /api/reviews/<id>/ - author or admin only
-    """
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    permission_classes = [IsReviewOwnerOrAdminOrReadOnly]
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_reviews(self, request):
+        """
+        GET /api/reviews/my_reviews/ - list only the logged-in user's own reviews.
+        """
+        reviews = Review.objects.select_related('reviewer', 'destination').filter(reviewer=request.user)
+        page = self.paginate_queryset(reviews)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
