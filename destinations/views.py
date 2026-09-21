@@ -27,12 +27,16 @@ class DestinationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def top_rated(self, request):
         """
-        GET /api/destinations/top_rated/ - the 5 highest-rated destinations,
+        GET /api/v1/destinations/top_rated/ - the 5 highest-rated destinations,
         based on average review rating (destinations with no reviews are excluded).
         """
         top = (
             Destination.objects
-            .annotate(avg_rating=Avg('reviews__rating'), review_count=Count('reviews'))
+            .select_related('created_by')
+            .annotate(
+                avg_rating=Avg('reviews__rating'),
+                review_count=Count('reviews')
+            )
             .filter(review_count__gt=0)
             .order_by('-avg_rating')[:5]
         )

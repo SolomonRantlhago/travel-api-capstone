@@ -1,12 +1,10 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from destinations.models import Destination
 
 
 class Itinerary(models.Model):
-    """
-    A trip planned by a user, made up of one or more itinerary items.
-    """
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('planned', 'Planned'),
@@ -24,7 +22,11 @@ class Itinerary(models.Model):
     )
     start_date = models.DateField()
     end_date = models.DateField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft'
+    )
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -32,15 +34,24 @@ class Itinerary(models.Model):
     class Meta:
         ordering = ['-created_at']
         verbose_name_plural = 'Itineraries'
+        indexes = [
+            models.Index(fields=['status'], name='itinerary_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.owner.username})"
 
+    def calculate_duration(self):
+        return (self.end_date - self.start_date).days + 1
+
+    def clean(self):
+        if self.end_date < self.start_date:
+            raise ValidationError(
+                "End date cannot be before start date."
+            )
+
 
 class ItineraryItem(models.Model):
-    """
-    A single planned stop within an itinerary — a destination visited on a specific day.
-    """
     itinerary = models.ForeignKey(
         Itinerary,
         on_delete=models.CASCADE,

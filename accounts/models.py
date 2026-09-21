@@ -16,6 +16,13 @@ class User(AbstractUser):
         blank=True
     )
     travel_preferences = models.JSONField(default=dict, blank=True)
+
+    favorite_destinations = models.ManyToManyField(
+        'destinations.Destination',
+        blank=True,
+        related_name='favorited_by'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

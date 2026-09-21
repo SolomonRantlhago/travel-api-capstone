@@ -1,12 +1,10 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from itineraries.models import Itinerary
 
 
 class Budget(models.Model):
-    """
-    A spending plan for a trip — a total limit split across categories.
-    """
     CATEGORY_CHOICES = [
         ('accommodation', 'Accommodation'),
         ('transport', 'Transport'),
@@ -26,7 +24,11 @@ class Budget(models.Model):
         on_delete=models.CASCADE,
         related_name='budgets'
     )
-    total_limit = models.DecimalField(max_digits=10, decimal_places=2)
+    total_limit = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
     currency = models.CharField(max_length=3, default='USD')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -44,22 +46,28 @@ class Budget(models.Model):
 
 
 class BudgetExpense(models.Model):
-    """
-    A single tracked expense against a trip's budget.
-    """
     budget = models.ForeignKey(
         Budget,
         on_delete=models.CASCADE,
         related_name='expenses'
     )
-    category = models.CharField(max_length=20, choices=Budget.CATEGORY_CHOICES)
+    category = models.CharField(
+        max_length=20,
+        choices=Budget.CATEGORY_CHOICES
+    )
     description = models.CharField(max_length=200)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date'], name='expense_date_idx'),
+        ]
 
     def __str__(self):
         return f"{self.description}: {self.amount} ({self.budget.itinerary.title})"

@@ -15,9 +15,14 @@ class BudgetListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        base = Budget.objects.select_related('itinerary', 'owner').prefetch_related('expenses')
+        base = Budget.objects.select_related(
+            'itinerary',
+            'owner'
+        ).prefetch_related('expenses')
+
         if user.is_staff or user.is_superuser:
             return base.all()
+
         return base.filter(owner=user)
 
     def perform_create(self, serializer):
@@ -28,7 +33,10 @@ class BudgetDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PUT/PATCH/DELETE /api/budgets/<id>/ - manage a specific budget
     """
-    queryset = Budget.objects.all()
+    queryset = Budget.objects.select_related(
+        'itinerary',
+        'owner'
+    ).prefetch_related('expenses')
     serializer_class = BudgetSerializer
     permission_classes = [permissions.IsAuthenticated, IsBudgetOwnerOrAdmin]
 
@@ -49,19 +57,24 @@ class BudgetExpenseListCreateView(generics.ListCreateAPIView):
             raise NotFound("Budget not found.")
 
     def get_queryset(self):
-        return BudgetExpense.objects.filter(budget_id=self.kwargs['budget_id'])
+        return BudgetExpense.objects.filter(
+            budget_id=self.kwargs['budget_id']
+        )
 
     def perform_create(self, serializer):
         budget = self.get_budget()
         user = self.request.user
+
         if not (budget.owner == user or user.is_staff or user.is_superuser):
             raise PermissionDenied("You do not own this budget.")
 
         new_amount = serializer.validated_data['amount']
+
         if budget.total_spent + new_amount > budget.total_limit:
             raise ValidationError(
                 f"This expense would exceed the budget limit. "
-                f"Remaining: {budget.remaining} {budget.currency}, attempted: {new_amount} {budget.currency}."
+                f"Remaining: {budget.remaining} {budget.currency}, "
+                f"attempted: {new_amount} {budget.currency}."
             )
 
         serializer.save(budget=budget)
