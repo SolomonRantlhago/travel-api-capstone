@@ -10,7 +10,7 @@ class ReviewListCreateView(generics.ListCreateAPIView):
     GET /api/reviews/ - list all reviews, filterable by destination or rating
     POST /api/reviews/ - create a new review (must be logged in)
     """
-    queryset = Review.objects.all()
+    queryset = Review.objects.select_related('reviewer', 'destination').all()
     serializer_class = ReviewSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['destination', 'rating']

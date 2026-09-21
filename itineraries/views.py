@@ -16,9 +16,10 @@ class ItineraryListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        base = Itinerary.objects.select_related('owner').prefetch_related('items__destination')
         if user.is_staff or user.is_superuser:
-            return Itinerary.objects.all()
-        return Itinerary.objects.filter(Q(owner=user) | Q(is_public=True))
+            return base.all()
+        return base.filter(Q(owner=user) | Q(is_public=True))
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

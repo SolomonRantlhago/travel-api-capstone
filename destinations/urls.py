@@ -1,7 +1,7 @@
-from django.urls import path
-from .views import DestinationListCreateView, DestinationDetailView
+from rest_framework.routers import DefaultRouter
+from .views import DestinationViewSet
 
-urlpatterns = [
-    path('', DestinationListCreateView.as_view(), name='destination-list-create'),
-    path('<int:pk>/', DestinationDetailView.as_view(), name='destination-detail'),
-]
+router = DefaultRouter()
+router.register(r'', DestinationViewSet, basename='destination')
+
+urlpatterns = router.urls

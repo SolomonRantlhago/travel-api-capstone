@@ -14,9 +14,10 @@ class BookingListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        base = Booking.objects.select_related('booked_by', 'itinerary')
         if user.is_staff or user.is_superuser:
-            return Booking.objects.all()
-        return Booking.objects.filter(booked_by=user)
+            return base.all()
+        return base.filter(booked_by=user)
 
     def perform_create(self, serializer):
         serializer.save(booked_by=self.request.user)

@@ -15,9 +15,10 @@ class BudgetListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        base = Budget.objects.select_related('itinerary', 'owner').prefetch_related('expenses')
         if user.is_staff or user.is_superuser:
-            return Budget.objects.all()
-        return Budget.objects.filter(owner=user)
+            return base.all()
+        return base.filter(owner=user)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
