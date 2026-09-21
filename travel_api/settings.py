@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'accounts',
     'destinations',
+    'itineraries',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
