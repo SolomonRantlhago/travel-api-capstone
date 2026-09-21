@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'destinations',
     'itineraries',
     'bookings',
+    'reviews',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
