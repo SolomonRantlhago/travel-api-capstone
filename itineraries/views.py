@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions
 from django.db.models import Q
+from rest_framework.exceptions import NotFound
 from .models import Itinerary, ItineraryItem
 from .serializers import ItinerarySerializer, ItineraryItemSerializer
 from .permissions import IsOwnerOrAdminOrReadOnlyIfPublic
@@ -41,7 +42,10 @@ class ItineraryItemListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_itinerary(self):
-        return Itinerary.objects.get(pk=self.kwargs['itinerary_id'])
+        try:
+            return Itinerary.objects.get(pk=self.kwargs['itinerary_id'])
+        except Itinerary.DoesNotExist:
+            raise NotFound("Itinerary not found.")
 
     def get_queryset(self):
         return ItineraryItem.objects.filter(itinerary_id=self.kwargs['itinerary_id'])
