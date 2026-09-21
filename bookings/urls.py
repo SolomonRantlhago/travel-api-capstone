@@ -1,7 +1,7 @@
-from django.urls import path
-from .views import BookingListCreateView, BookingDetailView
+from rest_framework.routers import DefaultRouter
+from .views import BookingViewSet
 
-urlpatterns = [
-    path('', BookingListCreateView.as_view(), name='booking-list-create'),
-    path('<int:pk>/', BookingDetailView.as_view(), name='booking-detail'),
-]
+router = DefaultRouter()
+router.register(r'', BookingViewSet, basename='booking')
+
+urlpatterns = router.urls
