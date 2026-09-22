@@ -8,6 +8,9 @@ from .views import (
 )
 
 
+app_name = 'itineraries'
+
+
 router = DefaultRouter()
 
 router.register(
@@ -15,7 +18,6 @@ router.register(
     ItineraryViewSet,
     basename='itinerary'
 )
-
 
 urlpatterns = [
     path(
