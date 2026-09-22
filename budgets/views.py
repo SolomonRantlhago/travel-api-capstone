@@ -3,9 +3,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404
+
 from .models import Budget, BudgetExpense
 from .serializers import BudgetSerializer, BudgetExpenseSerializer
-from .permissions import IsBudgetOwnerOrAdmin
+from .permissions import (
+    IsBudgetOwnerOrAdmin,
+    IsBudgetExpenseOwnerOrAdmin,
+)
 
 
 class BudgetListCreateView(generics.ListCreateAPIView):
@@ -34,16 +38,24 @@ class BudgetDetailView(generics.RetrieveUpdateDestroyAPIView):
         'owner'
     ).prefetch_related('expenses')
     serializer_class = BudgetSerializer
-    permission_classes = [permissions.IsAuthenticated, IsBudgetOwnerOrAdmin]
+    permission_classes = [
+        permissions.IsAuthenticated,
+        IsBudgetOwnerOrAdmin
+    ]
 
 
 class BudgetExpenseListCreateView(generics.ListCreateAPIView):
     serializer_class = BudgetExpenseSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [
+        permissions.IsAuthenticated,
+        IsBudgetExpenseOwnerOrAdmin
+    ]
 
     def get_budget(self):
         try:
-            return Budget.objects.get(pk=self.kwargs['budget_id'])
+            return Budget.objects.get(
+                pk=self.kwargs['budget_id']
+            )
         except Budget.DoesNotExist:
             raise NotFound("Budget not found.")
 
@@ -61,7 +73,9 @@ class BudgetExpenseListCreateView(generics.ListCreateAPIView):
             or user.is_staff
             or user.is_superuser
         ):
-            raise PermissionDenied("You do not own this budget.")
+            raise PermissionDenied(
+                "You do not own this budget."
+            )
 
         new_amount = serializer.validated_data['amount']
 

@@ -7,7 +7,10 @@ from django.shortcuts import get_object_or_404
 
 from .models import Itinerary, ItineraryItem
 from .serializers import ItinerarySerializer, ItineraryItemSerializer
-from .permissions import IsOwnerOrAdminOrReadOnlyIfPublic
+from .permissions import (
+    IsOwnerOrAdminOrReadOnlyIfPublic,
+    IsItineraryItemOwnerOrAdmin,
+)
 
 
 class ItineraryViewSet(viewsets.ModelViewSet):
@@ -61,7 +64,10 @@ class ItineraryViewSet(viewsets.ModelViewSet):
 
 class ItineraryItemListCreateView(generics.ListCreateAPIView):
     serializer_class = ItineraryItemSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [
+        permissions.IsAuthenticated,
+        IsItineraryItemOwnerOrAdmin
+    ]
 
     def get_itinerary(self):
         try:
