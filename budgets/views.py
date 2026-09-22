@@ -1,15 +1,14 @@
 from rest_framework import generics, permissions
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from django.shortcuts import get_object_or_404
 from .models import Budget, BudgetExpense
 from .serializers import BudgetSerializer, BudgetExpenseSerializer
 from .permissions import IsBudgetOwnerOrAdmin
 
 
 class BudgetListCreateView(generics.ListCreateAPIView):
-    """
-    GET /api/budgets/ - list the logged-in user's own budgets (all if admin)
-    POST /api/budgets/ - create a new budget for one of your own itineraries
-    """
     serializer_class = BudgetSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -30,9 +29,6 @@ class BudgetListCreateView(generics.ListCreateAPIView):
 
 
 class BudgetDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET/PUT/PATCH/DELETE /api/budgets/<id>/ - manage a specific budget
-    """
     queryset = Budget.objects.select_related(
         'itinerary',
         'owner'
@@ -42,11 +38,6 @@ class BudgetDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class BudgetExpenseListCreateView(generics.ListCreateAPIView):
-    """
-    GET /api/budgets/<budget_id>/expenses/ - list expenses for one budget
-    POST /api/budgets/<budget_id>/expenses/ - add a new expense (owner or admin only,
-    rejected if it would exceed the budget's total_limit)
-    """
     serializer_class = BudgetExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -65,7 +56,11 @@ class BudgetExpenseListCreateView(generics.ListCreateAPIView):
         budget = self.get_budget()
         user = self.request.user
 
-        if not (budget.owner == user or user.is_staff or user.is_superuser):
+        if not (
+            budget.owner == user
+            or user.is_staff
+            or user.is_superuser
+        ):
             raise PermissionDenied("You do not own this budget.")
 
         new_amount = serializer.validated_data['amount']
@@ -78,3 +73,50 @@ class BudgetExpenseListCreateView(generics.ListCreateAPIView):
             )
 
         serializer.save(budget=budget)
+
+
+@api_view(['GET'])
+def budget_summary(request, pk):
+    """
+    GET /api/v1/budgets/<id>/summary/
+    Return a summary of the selected budget.
+    """
+    budget = get_object_or_404(
+        Budget.objects.prefetch_related('expenses'),
+        pk=pk
+    )
+
+    if not (
+        budget.owner == request.user
+        or request.user.is_staff
+        or request.user.is_superuser
+    ):
+        return Response(
+            {"detail": "You do not have permission to view this budget."},
+            status=403
+        )
+
+    total_spent = budget.total_spent
+    remaining = budget.total_limit - total_spent
+
+    if total_spent == 0:
+        status = "Not started"
+    elif total_spent < budget.total_limit:
+        status = "Within budget"
+    elif total_spent == budget.total_limit:
+        status = "Budget reached"
+    else:
+        status = "Over budget"
+
+    return Response(
+        {
+            "budget_id": budget.id,
+            "total_limit": budget.total_limit,
+            "total_spent": total_spent,
+            "remaining": remaining,
+            "currency": budget.currency,
+            "expense_count": budget.expenses.count(),
+            "status": status,
+        },
+        status=200
+    )
