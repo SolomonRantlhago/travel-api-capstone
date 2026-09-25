@@ -76,12 +76,26 @@ class ItineraryItemListCreateView(generics.ListCreateAPIView):
             )
         except Itinerary.DoesNotExist:
             raise NotFound("Itinerary not found.")
-
     def get_queryset(self):
+        itinerary = self.get_itinerary()
+        user = self.request.user
+    
+        if user.is_staff or user.is_superuser:
+            return ItineraryItem.objects.select_related(
+                'destination'
+            ).filter(
+                itinerary=itinerary
+            )
+    
+        if itinerary.owner != user:
+            raise PermissionDenied(
+                "You do not own this itinerary."
+            )
+    
         return ItineraryItem.objects.select_related(
             'destination'
         ).filter(
-            itinerary_id=self.kwargs['itinerary_id']
+            itinerary=itinerary
         )
 
     def perform_create(self, serializer):

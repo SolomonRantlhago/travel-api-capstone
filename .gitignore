@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Coverage
+.coverage
+htmlcov/
+
 # Virtual environment
 venv/
 

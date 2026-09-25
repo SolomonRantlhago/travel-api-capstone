@@ -18,14 +18,15 @@ class BudgetListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+    
         base = Budget.objects.select_related(
             'itinerary',
             'owner'
-        ).prefetch_related('expenses')
-
+        ).prefetch_related('expenses').order_by('-created_at')
+    
         if user.is_staff or user.is_superuser:
             return base.all()
-
+    
         return base.filter(owner=user)
 
     def perform_create(self, serializer):
@@ -60,8 +61,21 @@ class BudgetExpenseListCreateView(generics.ListCreateAPIView):
             raise NotFound("Budget not found.")
 
     def get_queryset(self):
+        budget = self.get_budget()
+        user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            return BudgetExpense.objects.filter(
+                budget=budget
+            )
+
+        if budget.owner != user:
+            raise PermissionDenied(
+                "You do not own this budget."
+            )
+
         return BudgetExpense.objects.filter(
-            budget_id=self.kwargs['budget_id']
+            budget=budget
         )
 
     def perform_create(self, serializer):

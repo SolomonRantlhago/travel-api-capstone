@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions, filters
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
@@ -25,7 +25,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'rating']
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action in ['create', 'my_reviews']:
             return [permissions.IsAuthenticated()]
 
         if self.action in ['update', 'partial_update', 'destroy']:
@@ -63,6 +63,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([permissions.AllowAny])
 def destination_reviews(request, destination_id):
     """
     GET  /api/v1/reviews/destination/<destination_id>/
