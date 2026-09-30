@@ -9,7 +9,10 @@ class IsBudgetOwnerOrAdmin(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
 
-        if request.user.is_staff or request.user.is_superuser:
+        if (
+            request.user.is_authenticated
+            and request.user.is_site_admin
+        ):
             return True
 
         return obj.owner == request.user
@@ -23,7 +26,10 @@ class IsBudgetExpenseOwnerOrAdmin(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
 
-        if request.user.is_staff or request.user.is_superuser:
+        if (
+            request.user.is_authenticated
+            and request.user.is_site_admin
+        ):
             return True
 
         return obj.budget.owner == request.user

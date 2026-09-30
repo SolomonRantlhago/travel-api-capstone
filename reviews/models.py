@@ -33,7 +33,10 @@ class Review(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.reviewer.username} rated {self.destination.name}: {self.rating}/5"
+        return (
+            f"{self.reviewer.username} rated "
+            f"{self.destination.name}: {self.rating}/5"
+        )
 
     def rating_label(self):
         if self.rating >= 4:

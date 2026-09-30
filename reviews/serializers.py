@@ -37,7 +37,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
         validators = []
 
-    def get_rating_label(self, obj):
+    def get_rating_label(self, obj) -> str:
         return obj.rating_label()
 
     def validate(self, data):
@@ -60,3 +60,11 @@ class ReviewSerializer(serializers.ModelSerializer):
                 )
 
         return data
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+
+        if request and request.user.is_authenticated:
+            validated_data['reviewer'] = request.user
+
+        return super().create(validated_data)

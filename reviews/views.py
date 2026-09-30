@@ -2,11 +2,14 @@ from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from django.shortcuts import get_object_or_404
+from django.db.models import Count
 
 from .models import Review
 from .serializers import ReviewSerializer
 from .permissions import IsReviewOwnerOrAdminOrReadOnly
+from .filters import ReviewFilter
 from destinations.models import Destination
 
 
@@ -15,14 +18,22 @@ class ReviewViewSet(viewsets.ModelViewSet):
     Full CRUD for reviews. Anyone can read; only the author or an
     admin can update/delete a given review.
     """
-    queryset = Review.objects.select_related(
-        'reviewer',
-        'destination'
-    ).all()
     serializer_class = ReviewSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['destination', 'rating']
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_class = ReviewFilter
+    search_fields = [
+        'comment',
+        'destination__name',
+    ]
     ordering_fields = ['created_at', 'rating']
+
+    def get_queryset(self):
+        """Reviews with author and destination loaded in the same query."""
+        return Review.objects.select_related('reviewer', 'destination')
 
     def get_permissions(self):
         if self.action in ['create', 'my_reviews']:
@@ -34,7 +45,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return [permissions.AllowAny()]
 
     def perform_create(self, serializer):
-        serializer.save(reviewer=self.request.user)
+        serializer.save()
 
     @action(
         detail=False,
@@ -43,14 +54,10 @@ class ReviewViewSet(viewsets.ModelViewSet):
     )
     def my_reviews(self, request):
         """
-        GET /api/reviews/my_reviews/ - list only the logged-in user's own reviews.
+        GET /api/reviews/my_reviews/ - list only the logged-in
+        user's own reviews.
         """
-        reviews = Review.objects.select_related(
-            'reviewer',
-            'destination'
-        ).filter(
-            reviewer=request.user
-        )
+        reviews = self.get_queryset().filter(reviewer=request.user)
 
         page = self.paginate_queryset(reviews)
 
@@ -62,6 +69,15 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+@extend_schema(
+    methods=['GET'],
+    responses=ReviewSerializer(many=True)
+)
+@extend_schema(
+    methods=['POST'],
+    request=ReviewSerializer,
+    responses=ReviewSerializer
+)
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.AllowAny])
 def destination_reviews(request, destination_id):
@@ -83,6 +99,10 @@ def destination_reviews(request, destination_id):
             'destination'
         ).filter(
             destination=destination
+        ).annotate(
+            # Include the total number of reviews for the destination
+            # with each result.
+            destination_review_count=Count('destination__reviews')
         )
 
         serializer = ReviewSerializer(
@@ -113,6 +133,7 @@ def destination_reviews(request, destination_id):
         )
 
         if serializer.is_valid():
+            # Associate the review with the destination and authenticated user.
             review = serializer.save(
                 destination=destination,
                 reviewer=request.user

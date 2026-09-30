@@ -34,10 +34,15 @@ class Budget(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Budget for {self.itinerary.title} ({self.total_limit} {self.currency})"
+        return (
+            f"Budget for {self.itinerary.title} "
+            f"({self.total_limit} {self.currency})"
+        )
 
     @property
     def total_spent(self):
+        # Calculate the current total from the related expenses
+        # so the value always reflects the latest recorded spending.
         return sum(expense.amount for expense in self.expenses.all())
 
     @property
@@ -70,4 +75,7 @@ class BudgetExpense(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.description}: {self.amount} ({self.budget.itinerary.title})"
+        return (
+            f"{self.description}: {self.amount}"
+            f"({self.budget.itinerary.title})"
+        )

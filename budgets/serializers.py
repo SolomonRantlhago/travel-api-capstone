@@ -27,6 +27,16 @@ class BudgetExpenseSerializer(serializers.ModelSerializer):
 
         return value
 
+    def update(self, instance, validated_data):
+        validated_data.pop('budget', None)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.save()
+
+        return instance
+
 
 class BudgetSerializer(serializers.ModelSerializer):
     itinerary_title = serializers.CharField(
@@ -53,7 +63,7 @@ class BudgetSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
-    def get_budget_status(self, obj):
+    def get_budget_status(self, obj) -> str:
         if obj.total_spent == 0:
             return "Not started"
 
@@ -64,6 +74,27 @@ class BudgetSerializer(serializers.ModelSerializer):
             return "Budget reached"
 
         return "Over budget"
+
+    def validate_itinerary(self, value):
+        """
+        A budget can only be attached to an itinerary the user owns
+        (site admins may attach to any), and cannot be moved to a
+        different itinerary once created.
+        """
+        request = self.context.get('request')
+
+        if self.instance is not None and value != self.instance.itinerary:
+            raise serializers.ValidationError(
+                "A budget cannot be moved to a different itinerary."
+            )
+
+        if request and not request.user.is_site_admin:
+            if value.owner_id != request.user.id:
+                raise serializers.ValidationError(
+                    "You can only create budgets for your own itineraries."
+                )
+
+        return value
 
     def validate(self, data):
         total_limit = data.get('total_limit')

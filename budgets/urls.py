@@ -1,13 +1,23 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from .views import (
     BudgetListCreateView,
     BudgetDetailView,
     BudgetExpenseListCreateView,
+    BudgetReadOnlyViewSet,
     budget_summary,
 )
 
 app_name = 'budgets'
+
+router = DefaultRouter()
+
+router.register(
+    r'read-only',
+    BudgetReadOnlyViewSet,
+    basename='budget-read-only'
+)
 
 
 urlpatterns = [
@@ -31,4 +41,4 @@ urlpatterns = [
         budget_summary,
         name='budget-summary'
     ),
-]
+] + router.urls
