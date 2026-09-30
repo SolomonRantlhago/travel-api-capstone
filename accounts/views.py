@@ -1,15 +1,14 @@
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from .permissions import IsAdminRole
 
-from django.contrib.auth import (
-    get_user_model,
-    password_validation,
-)
+from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 
+from .validators import validate_password_strength
 from .serializers import (
     UserRegistrationSerializer,
     UserProfileSerializer,
@@ -24,7 +23,18 @@ User = get_user_model()
 
 class RegisterView(generics.CreateAPIView):
     """
-    POST /api/accounts/register/ - create a new user account.
+    POST /api/v1/accounts/register/ - create a new user account.
+
+    Example request:
+        {
+            "username": "maria",
+            "email": "maria@example.com",
+            "password": "S3cure-Trip-2026",
+            "confirm_password": "S3cure-Trip-2026"
+        }
+
+    Example response (201): the new user's id, username and email.
+    Weak or mismatching passwords are rejected with a 400.
     """
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -45,8 +55,17 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
 class PasswordChangeView(generics.GenericAPIView):
     """
-    POST /api/accounts/password/change/ - change the logged-in
+    POST /api/v1/accounts/password/change/ - change the logged-in
     user's password.
+
+    Example request:
+        {
+            "old_password": "S3cure-Trip-2026",
+            "new_password": "Even-Better-Pass-77",
+            "confirm_password": "Even-Better-Pass-77"
+        }
+
+    Example response (200): {"detail": "Password changed successfully."}
     """
     serializer_class = PasswordChangeSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -58,11 +77,6 @@ class PasswordChangeView(generics.GenericAPIView):
 
         user = request.user
         new_password = serializer.validated_data['new_password']
-
-        password_validation.validate_password(
-            new_password,
-            user
-        )
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
@@ -110,6 +124,8 @@ class PasswordResetRequestView(generics.GenericAPIView):
 
         token = default_token_generator.make_token(user)
 
+        # Generate a temporary token so only the intended user can
+        # reset the password.
         reset_link = (
             f"http://localhost:8000/api/v1/accounts/"
             f"password/reset/confirm/"
@@ -176,6 +192,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                 status=400
             )
 
+        # Reject the reset request if the token is invalid or has expired.
         if not default_token_generator.check_token(
             user,
             token
@@ -187,9 +204,11 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                 status=400
             )
 
-        password_validation.validate_password(
+        # Validate the new password against Django's configured password rules.
+        validate_password_strength(
             new_password,
-            user
+            user,
+            field='new_password'
         )
 
         user.set_password(new_password)
@@ -209,7 +228,7 @@ class UserListView(generics.ListAPIView):
     """
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminRole]
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -219,4 +238,4 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminRole]

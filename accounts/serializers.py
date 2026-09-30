@@ -1,7 +1,17 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+from .validators import validate_password_strength
+
 User = get_user_model()
+
+
+class BaseModelSerializer(serializers.ModelSerializer):
+    """
+    Base serializer for project model serializers.
+    """
+    class Meta:
+        abstract = True
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -33,6 +43,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"password": "Passwords do not match."}
             )
+
+        # Apply Django's password rules (length, common, numeric, similarity
+        # to the username/email) to the not-yet-saved user.
+        candidate = User(
+            username=data.get('username', ''),
+            email=data.get('email', ''),
+            first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', ''),
+        )
+        validate_password_strength(data['password'], candidate)
         return data
 
     def create(self, validated_data):
@@ -46,7 +66,28 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(BaseModelSerializer):
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.save()
+
+        return instance
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        data['profile_complete'] = all([
+            instance.first_name,
+            instance.last_name,
+            instance.phone,
+            instance.date_of_birth,
+            instance.bio,
+        ])
+
+        return data
+
     class Meta:
         model = User
         fields = [
@@ -68,7 +109,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
 
-class AdminUserSerializer(serializers.ModelSerializer):
+class AdminUserSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = [
@@ -126,6 +167,12 @@ class PasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"new_password": "Passwords do not match."}
             )
+
+        validate_password_strength(
+            data['new_password'],
+            self.context['request'].user,
+            field='new_password'
+        )
 
         return data
 

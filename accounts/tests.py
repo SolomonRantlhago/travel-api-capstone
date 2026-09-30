@@ -95,6 +95,8 @@ class RegistrationTests(APITestCase):
         self.assertTrue(
             user.check_password('testpass123')
         )
+
+
 class ProfileTests(APITestCase):
 
     def setUp(self):
@@ -183,6 +185,8 @@ class ProfileTests(APITestCase):
             self.user.created_at,
             original_created_at
         )
+
+
 class PasswordChangeTests(APITestCase):
 
     def setUp(self):
@@ -262,6 +266,7 @@ class PasswordChangeTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
 
+
 class PasswordResetRequestTests(APITestCase):
 
     def setUp(self):
@@ -305,6 +310,7 @@ class PasswordResetRequestTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
 
 class PasswordResetConfirmTests(APITestCase):
 
@@ -391,6 +397,7 @@ class PasswordResetConfirmTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
 
+
 class AdminUserManagementTests(APITestCase):
 
     def setUp(self):
@@ -398,13 +405,15 @@ class AdminUserManagementTests(APITestCase):
             username='admin',
             email='admin@test.com',
             password='adminpass123',
-            is_staff=True
+            is_staff=True,
+            role='admin'
         )
 
         self.user = User.objects.create_user(
             username='normaluser',
             email='normal@test.com',
-            password='userpass123'
+            password='userpass123',
+            role='traveler'
         )
 
         self.list_url = '/api/v1/accounts/users/'
@@ -432,6 +441,21 @@ class AdminUserManagementTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_role_admin_can_list_users(self):
+        role_admin = User.objects.create_user(
+            username='roleadmin',
+            email='roleadmin@test.com',
+            password='adminpass123',
+            role='admin',
+            is_staff=False
+        )
+
+        self.client.force_authenticate(user=role_admin)
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, 200)
+
     def test_normal_user_cannot_view_user_detail(self):
         self.client.force_authenticate(user=self.user)
 
@@ -441,6 +465,25 @@ class AdminUserManagementTests(APITestCase):
 
     def test_admin_can_view_user_detail(self):
         self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(self.detail_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['username'],
+            'normaluser'
+        )
+
+    def test_role_admin_can_view_user_detail(self):
+        role_admin = User.objects.create_user(
+            username='roleadmin',
+            email='roleadmin@test.com',
+            password='adminpass123',
+            role='admin',
+            is_staff=False
+        )
+
+        self.client.force_authenticate(user=role_admin)
 
         response = self.client.get(self.detail_url)
 
@@ -488,3 +531,107 @@ class AdminUserManagementTests(APITestCase):
                 username='normaluser'
             ).exists()
         )
+
+    def test_unauthenticated_user_cannot_access_user_detail(self):
+        response = self.client.get(self.detail_url)
+
+        self.assertEqual(response.status_code, 401)
+
+
+class PasswordStrengthTests(APITestCase):
+    """Weak passwords must be rejected with a 400, never a 500."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='strongpw',
+            email='strongpw@test.com',
+            password='Original-Pass-42'
+        )
+
+    def test_registration_rejects_numeric_password(self):
+        response = self.client.post(
+            '/api/v1/accounts/register/',
+            {
+                'username': 'weakling',
+                'email': 'weakling@test.com',
+                'password': '12345678',
+                'confirm_password': '12345678',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('password', response.data)
+        self.assertFalse(User.objects.filter(username='weakling').exists())
+
+    def test_registration_rejects_password_similar_to_username(self):
+        response = self.client.post(
+            '/api/v1/accounts/register/',
+            {
+                'username': 'travelerjoe',
+                'email': 'joe@test.com',
+                'password': 'travelerjoe',
+                'confirm_password': 'travelerjoe',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_password_change_rejects_weak_password(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            '/api/v1/accounts/password/change/',
+            {
+                'old_password': 'Original-Pass-42',
+                'new_password': '12345678',
+                'confirm_password': '12345678',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('new_password', response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('Original-Pass-42'))
+
+    def test_password_reset_confirm_rejects_weak_password(self):
+        response = self.client.post(
+            '/api/v1/accounts/password/reset/confirm/',
+            {
+                'uid': urlsafe_base64_encode(force_bytes(self.user.pk)),
+                'token': default_token_generator.make_token(self.user),
+                'new_password': '12345678',
+                'confirm_password': '12345678',
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('new_password', response.data)
+
+
+class UserModelTests(APITestCase):
+
+    def test_is_site_admin_true_for_admin_role_staff_and_superuser(self):
+        admin_role = User.objects.create_user(
+            'roleadmin', 'ra@test.com', 'Pass-word-123', role='admin'
+        )
+        staff = User.objects.create_user(
+            'staffer', 'st@test.com', 'Pass-word-123', is_staff=True
+        )
+        superuser = User.objects.create_superuser(
+            'super', 'su@test.com', 'Pass-word-123'
+        )
+
+        self.assertTrue(admin_role.is_site_admin)
+        self.assertTrue(staff.is_site_admin)
+        self.assertTrue(superuser.is_site_admin)
+
+    def test_is_site_admin_false_for_regular_traveler(self):
+        traveler = User.objects.create_user(
+            'plain', 'plain@test.com', 'Pass-word-123'
+        )
+
+        self.assertFalse(traveler.is_site_admin)

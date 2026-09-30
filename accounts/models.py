@@ -6,7 +6,17 @@ class User(AbstractUser):
     """
     Custom user model with additional profile fields.
     """
+    class Role(models.TextChoices):
+        TRAVELER = 'traveler', 'Traveler'
+        ADMIN = 'admin', 'Admin'
+
     email = models.EmailField(unique=True)
+
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default='traveler'
+    )
     phone = models.CharField(max_length=20, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True)
@@ -37,3 +47,12 @@ class User(AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip() or self.username
+
+    @property
+    def is_site_admin(self):
+        """True for staff, superusers and users with the admin role."""
+        return bool(
+            self.is_staff
+            or self.is_superuser
+            or self.role == self.Role.ADMIN
+        )
