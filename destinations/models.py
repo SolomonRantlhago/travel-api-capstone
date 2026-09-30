@@ -51,6 +51,12 @@ class Destination(models.Model):
         null=True,
         related_name='destinations_created'
     )
+    amenities = models.ManyToManyField(
+        'Amenity',
+        through='DestinationAmenity',
+        related_name='destinations',
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
