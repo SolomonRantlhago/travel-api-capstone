@@ -6,7 +6,15 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'travel_api.settings')
+    # `python manage.py test` uses the lightweight test settings
+    # (fast hasher, temporary MEDIA_ROOT); everything else uses the
+    # normal settings.
+    default_settings = (
+        'travel_api.test_settings'
+        if len(sys.argv) > 1 and sys.argv[1] == 'test'
+        else 'travel_api.settings'
+    )
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', default_settings)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

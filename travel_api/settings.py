@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-avef9*$*_)%!=!&*cfe&sg8akoe(um6yr%kk8=&3ycc1=nl9ts'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 
 # Application definition
@@ -57,19 +59,65 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': (
+        'rest_framework.pagination.PageNumberPagination'
+    ),
     'PAGE_SIZE': 10,
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Turns Django-level errors (ValidationError, IntegrityError) into
+    # proper 400/409 API responses instead of 500s.
+    'EXCEPTION_HANDLER': 'travel_api.exceptions.custom_exception_handler',
 }
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Travel Itinerary Planning & Booking API',
+
     'DESCRIPTION': (
         'API for planning trips, browsing destinations, booking itineraries, '
         'tracking budgets, and leaving reviews.'
     ),
+
     'VERSION': '1.0.0',
+
     'SERVE_INCLUDE_SCHEMA': False,
+
+    'ENUM_NAME_OVERRIDES': {
+        # TextChoices classes (importable paths)
+        'PaymentStatusEnum': 'bookings.models.Booking.PaymentStatusChoices',
+        'BookingStatusEnum': 'bookings.models.Booking.StatusChoices',
+        'ItineraryStatusEnum': 'itineraries.models.Itinerary.Status',
+        'AccommodationTypeEnum': 'bookings.models.Accommodation.TypeChoices',
+        'ActivityCategoryEnum': 'bookings.models.Activity.CategoryChoices',
+        'ActivityLogActionEnum': 'bookings.models.ActivityLog.ActionChoices',
+        # List-based choice sets (same field name "category" / "price_range"
+        # on different models — unique names prevent collisions)
+        'DestinationCategoryEnum': [
+            ('beach', 'Beach'),
+            ('mountain', 'Mountain'),
+            ('city', 'City'),
+            ('countryside', 'Countryside'),
+            ('cultural', 'Cultural/Historical'),
+            ('adventure', 'Adventure'),
+        ],
+        'DestinationPriceRangeEnum': [
+            ('budget', 'Budget'),
+            ('moderate', 'Moderate'),
+            ('luxury', 'Luxury'),
+        ],
+        'BudgetCategoryEnum': [
+            ('accommodation', 'Accommodation'),
+            ('transport', 'Transport'),
+            ('food', 'Food & Drink'),
+            ('activities', 'Activities'),
+            ('shopping', 'Shopping'),
+            ('other', 'Other'),
+        ],
+    },
 }
 
 MIDDLEWARE = [
@@ -118,16 +166,28 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'NAME': (
+            'django.contrib.auth.password_validation.'
+            'UserAttributeSimilarityValidator'
+        ),
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'NAME': (
+            'django.contrib.auth.password_validation.'
+            'MinimumLengthValidator'
+        ),
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        'NAME': (
+            'django.contrib.auth.password_validation.'
+            'CommonPasswordValidator'
+        ),
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'NAME': (
+            'django.contrib.auth.password_validation.'
+            'NumericPasswordValidator'
+        ),
     },
 ]
 
@@ -148,9 +208,32 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+MAILERS = {
+    'default': {
+        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+    },
+}
+
+
+# Security hardening: only applied when DEBUG is off (i.e. in production).
+# Each value can be overridden from the environment if needed.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config(
+        'SECURE_SSL_REDIRECT', default=True, cast=bool
+    )
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = config(
+        'SECURE_HSTS_SECONDS', default=31536000, cast=int
+    )
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
