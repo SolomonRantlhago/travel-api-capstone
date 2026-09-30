@@ -5,13 +5,13 @@ from destinations.models import Destination
 
 
 class Itinerary(models.Model):
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('planned', 'Planned'),
-        ('ongoing', 'Ongoing'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    ]
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        PLANNED = 'planned', 'Planned'
+        ONGOING = 'ongoing', 'Ongoing'
+        COMPLETED = 'completed', 'Completed'
+        CANCELLED = 'cancelled', 'Cancelled'
 
     title = models.CharField(max_length=200)
     description = models.TextField(max_length=1000, blank=True)
@@ -24,10 +24,15 @@ class Itinerary(models.Model):
     end_date = models.DateField()
     status = models.CharField(
         max_length=20,
-        choices=STATUS_CHOICES,
+        choices=Status.choices,
         default='draft'
     )
     is_public = models.BooleanField(default=False)
+    pdf_file = models.FileField(
+        upload_to='itineraries/',
+        null=True,
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -72,4 +77,48 @@ class ItineraryItem(models.Model):
         unique_together = ['itinerary', 'destination', 'day_number']
 
     def __str__(self):
-        return f"Day {self.day_number}: {self.destination.name} ({self.itinerary.title})"
+        return (
+            f"Day {self.day_number}: "
+            f"{self.destination.name} ({self.itinerary.title})"
+        )
+
+
+class ItineraryCollaboration(models.Model):
+    class Role(models.TextChoices):
+        VIEWER = 'viewer', 'Viewer'
+        EDITOR = 'editor', 'Editor'
+        ADMIN = 'admin', 'Admin'
+
+    itinerary = models.ForeignKey(
+        Itinerary,
+        on_delete=models.CASCADE,
+        related_name='collaborations'
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='itinerary_collaborations'
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default='viewer'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['itinerary', 'user'],
+                name='unique_itinerary_collaborator'
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.user.username} - "
+            f"{self.itinerary.title} ({self.role})"
+        )

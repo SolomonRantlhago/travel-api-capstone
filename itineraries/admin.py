@@ -9,7 +9,8 @@ class ItineraryItemInline(admin.TabularInline):
 
 @admin.register(Itinerary)
 class ItineraryAdmin(admin.ModelAdmin):
-    list_display = ['title', 'owner', 'start_date', 'end_date', 'status', 'is_public']
+    list_display = ['title', 'owner', 'start_date',
+                    'end_date', 'status', 'is_public']
     list_filter = ['status', 'is_public']
     search_fields = ['title', 'owner__username']
     inlines = [ItineraryItemInline]
